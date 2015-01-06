@@ -1,0 +1,64 @@
+package com.webraid.cocproxy.network;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.util.Arrays;
+
+import com.webraid.cocproxy.utils.Log;
+import com.webraid.cocproxy.utils.Packet;
+import com.webraid.cocproxy.utils.Packet.PacketSide;
+import com.webraid.cocproxy.utils.Packet.PacketType;
+
+public class Client implements Runnable {
+
+	private Socket socket;
+	private static OutputStream os;
+	private InputStream is;
+
+	private byte[] request = new byte[1024];
+
+	public Client(Socket clientSocket) throws IOException {
+		socket = clientSocket;
+		is = socket.getInputStream();
+		os = socket.getOutputStream();
+		Log.logInfo("* Client connected");
+	}
+
+	@Override
+	public void run() {
+		int bytes_read;
+		try {
+			while ((bytes_read = is.read(request)) != -1) {
+				Packet currentPacket = new Packet(request,
+						PacketSide.FROM_CLIENT);
+				boolean toSendServer = true;
+				Log.logPacket(currentPacket);
+				System.out.println("Packet type : "
+						+ currentPacket.getType()
+						+ (currentPacket.getType() == PacketType.UNKNOWN ? "("
+								+ PacketType.getPacketByteValue(request) + ")"
+								: ""));
+				if (currentPacket.getType() == PacketType.CLAN_MESSAGE
+						|| currentPacket.getType() == PacketType.MESSAGE_GENERAL) {
+					Log.logImportantInfo("Message to be sent. With "
+							+ (currentPacket.getLength() - 4)
+							+ " char(s). Type is "
+							+ currentPacket.getType().name());
+					System.out.println(Arrays.toString(request));
+				}
+				if (toSendServer) {
+					Server.getOuputStream().write(request, 0, bytes_read);
+					Server.getOuputStream().flush();
+				}
+			}
+		} catch (IOException e) {
+		}
+	}
+
+	public static OutputStream getOutputStream() {
+		return os;
+	}
+
+}
